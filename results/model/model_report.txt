@@ -1,0 +1,32 @@
+Model Report
+============
+
+Algorithm
+---------
+The model used is a Logistic Regression classifier.
+We utilized `sklearn.linear_model.LogisticRegression` with the following key parameters:
+- `class_weight='balanced'`: To handle the imbalance in the dataset (far fewer defaults than non-defaults).
+- `max_iter=3000`: To ensure convergence.
+- `solver='lbfgs'`: A standard optimizer for logistic regression.
+- `StandardScaler`: Applied to features before the model to ensure all features are on the same scale, which is crucial for Logistic Regression.
+
+Why Accuracy shouldn't be used?
+-------------------------------
+Accuracy is not a suitable metric for this problem because the classes are highly imbalanced.
+The target variable (Default) has a much lower frequency than the non-default class.
+If a model simply predicted "No Default" for every customer, it would achieve a very high accuracy (likely >90%) but would be useless for identifying risk.
+Instead, we use **ROC AUC (Receiver Operating Characteristic - Area Under Curve)**.
+AUC measures the ability of the model to distinguish between classes. An AUC of 0.5 represents a random guess, while 1.0 represents a perfect model.
+Our goal was to achieve an AUC > 0.62.
+
+Limits and Possible Improvements
+--------------------------------
+Limits:
+- **Linearity Assumption**: Logistic Regression assumes a linear relationship between input features and the log-odds of the outcome. It may miss complex non-linear patterns.
+- **Feature Engineering**: The current model relies heavily on the quality of engineered features. While we included some auxiliary data, more complex aggregations could be beneficial.
+
+Possible Improvements:
+- **Tree-based Models**: Algorithms like LightGBM, XGBoost, or CatBoost typically perform better on tabular data with less preprocessing required and can capture non-linear relationships.
+- **More Feature Engineering**: Creating domain-specific features (e.g., debt-to-income ratios, credit utilization trends) could improve performance.
+- **Ensembling**: Combining predictions from multiple models (e.g., Logistic Regression + LightGBM) often yields better results.
+- **Hyperparameter Tuning**: Systematically searching for optimal hyperparameters using GridSearch or Bayesian Optimization.
