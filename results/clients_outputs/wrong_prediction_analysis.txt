@@ -1,0 +1,35 @@
+======================================================================
+ANALYSIS: WHY THE MODEL GOT THIS PREDICTION WRONG
+======================================================================
+
+True Outcome: DEFAULTED (1)
+Model Predicted Probability of Default: 10.75%
+Model Decision: LOW RISK
+
+ERROR TYPE: FALSE NEGATIVE (Missed a defaulter)
+This is a DANGEROUS error - the model approved a risky client.
+
+FACTORS THAT MISLED THE MODEL (pushed toward 'safe'):
+--------------------------------------------------
+  • Basementarea Avg
+    Client Value: 0.4389, Population Mean: 0.0884
+    SHAP Impact: -1.3565 (pushed toward SAFE)
+  • Goods Price
+    Client Value: 1170000.0000, Population Mean: 538396.2074
+    SHAP Impact: -0.9051 (pushed toward SAFE)
+  • Elevators Medi
+    Client Value: 0.7400, Population Mean: 0.0781
+    SHAP Impact: -0.6992 (pushed toward SAFE)
+  • Livingarea Medi
+    Client Value: 0.7242, Population Mean: 0.1086
+    SHAP Impact: -0.6102 (pushed toward SAFE)
+  • Ext Source Mean
+    Client Value: 0.6958, Population Mean: 0.5114
+    SHAP Impact: -0.4696 (pushed toward SAFE)
+
+CONCLUSION:
+--------------------------------------------------
+The model relies heavily on external scores (EXT_SOURCE) and employment
+data. This client likely had atypical patterns that don't fit the linear
+assumptions of logistic regression. A tree-based model might capture
+such non-linear interactions better.

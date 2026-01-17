@@ -1,12 +1,16 @@
 """
-Training pipeline placeholder with cross-validation and learning curve hooks.
+Training pipeline with cross-validation and learning curve hooks.
+Added LightGBM option and better feature handling.
 """
 from pathlib import Path
 from typing import Tuple
+import warnings
+warnings.filterwarnings('ignore')
 
 import joblib
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 from sklearn.base import clone
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
@@ -14,10 +18,21 @@ from sklearn.model_selection import StratifiedKFold, learning_curve, train_test_
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+# Try to import LightGBM (optional but recommended)
+try:
+    import lightgbm as lgb
+    LGBM_AVAILABLE = True
+except ImportError:
+    LGBM_AVAILABLE = False
+    print("LightGBM not available. Using Logistic Regression only.")
+
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
 MODEL_DIR = RESULTS_DIR / "model"
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
+
+# Configuration
+USE_LIGHTGBM = False  # Set to True to use LightGBM instead of LogReg
 
 
 def load_training_set(path: Path = None) -> Tuple[pd.DataFrame, pd.Series]:
@@ -34,20 +49,42 @@ def load_training_set(path: Path = None) -> Tuple[pd.DataFrame, pd.Series]:
         X = pd.get_dummies(X, columns=cat_cols, dummy_na=True)
 
     # Replace infs and fill remaining NaNs
-    X = X.replace([float("inf"), float("-inf")], pd.NA).fillna(0)
+    X = X.replace([float("inf"), float("-inf")], np.nan).fillna(0)
+    
+    print(f"Loaded training data: {X.shape[0]} samples, {X.shape[1]} features")
     return X, y
 
 
-def make_model():
-    """Create a baseline model with scaling and higher max_iter."""
-    log_reg = LogisticRegression(
-        max_iter=3000,
-        n_jobs=-1,
-        solver="lbfgs",
-        class_weight="balanced",
-    )
-    # StandardScaler with mean disabled to support sparse-ish inputs safely
-    return make_pipeline(StandardScaler(with_mean=False), log_reg)
+def make_model(use_lgbm: bool = False):
+    """Create model - either LightGBM or Logistic Regression."""
+    
+    if use_lgbm and LGBM_AVAILABLE:
+        print("Using LightGBM model")
+        return lgb.LGBMClassifier(
+            n_estimators=500,
+            learning_rate=0.05,
+            max_depth=6,
+            num_leaves=31,
+            min_child_samples=50,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            reg_alpha=0.1,
+            reg_lambda=0.1,
+            class_weight='balanced',
+            random_state=42,
+            n_jobs=-1,
+            verbose=-1
+        )
+    else:
+        print("Using Logistic Regression model")
+        log_reg = LogisticRegression(
+            max_iter=3000,
+            n_jobs=-1,
+            solver="lbfgs",
+            class_weight="balanced",
+            C=0.1,  # Regularization strength (lower = more regularization)
+        )
+        return make_pipeline(StandardScaler(with_mean=False), log_reg)
 
 
 def cross_validate(model, X, y, n_splits: int = 5, random_state: int = 42):
@@ -102,17 +139,60 @@ def plot_learning_curve(model, X, y, output_path: Path = None, max_samples: int 
 
 
 def train_and_save():
-    """End-to-end training stub: load data, CV, plot learning curve, persist model."""
+    """End-to-end training: load data, CV, plot learning curve, persist model."""
+    print("=" * 60)
+    print("CREDIT SCORING MODEL TRAINING")
+    print("=" * 60)
+    
     X, y = load_training_set()
-    model = make_model()
+    model = make_model(use_lgbm=USE_LIGHTGBM)
+    
+    print(f"\nClass distribution: {y.value_counts().to_dict()}")
+    print(f"Default rate: {y.mean():.2%}")
+    
     aucs = cross_validate(model, X, y)
-    print(f"CV AUCs: {aucs}; mean={sum(aucs)/len(aucs):.4f}")
+    mean_auc = sum(aucs) / len(aucs)
+    std_auc = np.std(aucs)
+    print(f"\nCV Results:")
+    print(f"  AUCs: {[f'{a:.4f}' for a in aucs]}")
+    print(f"  Mean: {mean_auc:.4f} (+/- {std_auc:.4f})")
+    
+    print("\nGenerating learning curve...")
     plot_path = plot_learning_curve(model, X, y)
-    fitted = model.fit(X, y)
+    
+    print("\nTraining final model on full data...")
+    fitted = clone(model).fit(X, y) if not (USE_LIGHTGBM and LGBM_AVAILABLE) else model.fit(X, y)
+    
     model_path = MODEL_DIR / "baseline_logreg.joblib"
     joblib.dump(fitted, model_path)
-    print(f"Saved model to {model_path}")
-    print(f"Saved learning curve to {plot_path}")
+    
+    # Save feature names for later use
+    feature_names_path = MODEL_DIR / "feature_names.txt"
+    with open(feature_names_path, 'w') as f:
+        for col in X.columns:
+            f.write(f"{col}\n")
+    
+    print(f"\n{'=' * 60}")
+    print("TRAINING COMPLETE")
+    print(f"{'=' * 60}")
+    print(f"  Model saved to: {model_path}")
+    print(f"  Learning curve: {plot_path}")
+    print(f"  CV AUC: {mean_auc:.4f}")
+    
+    # Update model report with actual CV scores
+    report_path = MODEL_DIR / "model_report.txt"
+    if report_path.exists():
+        with open(report_path, 'r') as f:
+            content = f.read()
+        # Append actual scores
+        if "ACTUAL TRAINING RESULTS" not in content:
+            with open(report_path, 'a') as f:
+                f.write(f"\n\nACTUAL TRAINING RESULTS\n")
+                f.write(f"{'=' * 30}\n")
+                f.write(f"Cross-Validation AUCs: {[f'{a:.4f}' for a in aucs]}\n")
+                f.write(f"Mean CV AUC: {mean_auc:.4f} (+/- {std_auc:.4f})\n")
+                f.write(f"Number of features: {X.shape[1]}\n")
+                f.write(f"Training samples: {X.shape[0]}\n")
 
 
 if __name__ == "__main__":

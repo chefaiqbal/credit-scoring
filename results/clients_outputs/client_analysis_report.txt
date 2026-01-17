@@ -1,0 +1,100 @@
+======================================================================
+CREDIT SCORING MODEL - CLIENT ANALYSIS REPORT
+======================================================================
+
+======================================================================
+CLIENT REPORT: client_correct_train
+SK_ID_CURR: 105410
+======================================================================
+
+Predicted Default Probability: 96.88%
+Risk Classification: HIGH RISK
+Actual Outcome: DEFAULTED
+Model Prediction: CORRECT
+
+KEY CLIENT CHARACTERISTICS:
+----------------------------------------
+  Credit Amount: 909,697.50
+  Total Income: 157,500.00
+  Loan Annuity: 46,579.50
+  External Score 1: 0.25
+  External Score 2: 0.23
+  External Score 3: 0.26
+  Age: 34.7 years
+  Employment: 8.0 years
+
+======================================================================
+CLIENT REPORT: client_wrong_train
+SK_ID_CURR: 101541
+======================================================================
+
+Predicted Default Probability: 10.75%
+Risk Classification: LOW RISK
+Actual Outcome: DEFAULTED
+*** MODEL PREDICTION: INCORRECT ***
+
+KEY CLIENT CHARACTERISTICS:
+----------------------------------------
+  Credit Amount: 1,170,000.00
+  Total Income: 202,500.00
+  Loan Annuity: 46,525.50
+  External Score 1: 0.87
+  External Score 2: 0.77
+  External Score 3: 0.45
+  Age: 39.2 years
+  Employment: 5.3 years
+
+======================================================================
+ANALYSIS: WHY THE MODEL GOT THIS PREDICTION WRONG
+======================================================================
+
+True Outcome: DEFAULTED (1)
+Model Predicted Probability of Default: 10.75%
+Model Decision: LOW RISK
+
+ERROR TYPE: FALSE NEGATIVE (Missed a defaulter)
+This is a DANGEROUS error - the model approved a risky client.
+
+FACTORS THAT MISLED THE MODEL (pushed toward 'safe'):
+--------------------------------------------------
+  • Basementarea Avg
+    Client Value: 0.4389, Population Mean: 0.0884
+    SHAP Impact: -1.3565 (pushed toward SAFE)
+  • Goods Price
+    Client Value: 1170000.0000, Population Mean: 538396.2074
+    SHAP Impact: -0.9051 (pushed toward SAFE)
+  • Elevators Medi
+    Client Value: 0.7400, Population Mean: 0.0781
+    SHAP Impact: -0.6992 (pushed toward SAFE)
+  • Livingarea Medi
+    Client Value: 0.7242, Population Mean: 0.1086
+    SHAP Impact: -0.6102 (pushed toward SAFE)
+  • Ext Source Mean
+    Client Value: 0.6958, Population Mean: 0.5114
+    SHAP Impact: -0.4696 (pushed toward SAFE)
+
+CONCLUSION:
+--------------------------------------------------
+The model relies heavily on external scores (EXT_SOURCE) and employment
+data. This client likely had atypical patterns that don't fit the linear
+assumptions of logistic regression. A tree-based model might capture
+such non-linear interactions better.
+
+======================================================================
+CLIENT REPORT: client_test
+SK_ID_CURR: 100001
+======================================================================
+
+Predicted Default Probability: 40.74%
+Risk Classification: LOW RISK
+
+KEY CLIENT CHARACTERISTICS:
+----------------------------------------
+  Credit Amount: 568,800.00
+  Total Income: 135,000.00
+  Loan Annuity: 20,560.50
+  External Score 1: 0.75
+  External Score 2: 0.79
+  External Score 3: 0.16
+  Age: 52.7 years
+  Employment: 6.4 years

@@ -144,11 +144,63 @@ def build_features() -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Load application data and aggregate auxiliary tables into SK_ID_CURR level features.
     Returns train and test feature DataFrames.
+    
     """
     app_train, app_test = load_application_data()
     aux_tables = load_auxiliary_tables()
 
     full = pd.concat([app_train, app_test], ignore_index=True, sort=False)
+    
+    # =========================================================================
+    # DOMAIN-SPECIFIC FEATURE ENGINEERING (Senior ML Enhancement)
+    # =========================================================================
+    
+    # 1. Credit-to-Income Ratio (key risk indicator)
+    full['CREDIT_INCOME_RATIO'] = full['AMT_CREDIT'] / (full['AMT_INCOME_TOTAL'] + 1)
+    
+    # 2. Annuity-to-Income Ratio (debt burden)
+    full['ANNUITY_INCOME_RATIO'] = full['AMT_ANNUITY'] / (full['AMT_INCOME_TOTAL'] + 1)
+    
+    # 3. Credit-to-Goods Ratio (loan vs actual goods value)
+    full['CREDIT_GOODS_RATIO'] = full['AMT_CREDIT'] / (full['AMT_GOODS_PRICE'] + 1)
+    
+    # 4. Age in years (more interpretable)
+    full['AGE_YEARS'] = full['DAYS_BIRTH'] / -365
+    
+    # 5. Employment years
+    full['EMPLOYMENT_YEARS'] = full['DAYS_EMPLOYED'] / -365
+    full['EMPLOYMENT_YEARS'] = full['EMPLOYMENT_YEARS'].apply(lambda x: 0 if x < 0 else x)  # Handle pensioners
+    
+    # 6. Income per family member
+    full['INCOME_PER_FAMILY'] = full['AMT_INCOME_TOTAL'] / (full['CNT_FAM_MEMBERS'] + 1)
+    
+    # 7. External sources combined (often most predictive)
+    ext_cols = ['EXT_SOURCE_1', 'EXT_SOURCE_2', 'EXT_SOURCE_3']
+    for col in ext_cols:
+        if col in full.columns:
+            full[col] = full[col].fillna(full[col].median())
+    
+    full['EXT_SOURCE_MEAN'] = full[ext_cols].mean(axis=1)
+    full['EXT_SOURCE_STD'] = full[ext_cols].std(axis=1)
+    full['EXT_SOURCE_PROD'] = full['EXT_SOURCE_1'] * full['EXT_SOURCE_2'] * full['EXT_SOURCE_3']
+    
+    # 8. Days employed percentage of life
+    full['EMPLOYED_TO_AGE_RATIO'] = full['DAYS_EMPLOYED'] / (full['DAYS_BIRTH'] + 1)
+    
+    # 9. Document flags sum (simplify many binary flags)
+    doc_cols = [c for c in full.columns if c.startswith('FLAG_DOCUMENT')]
+    if doc_cols:
+        full['DOCUMENT_COUNT'] = full[doc_cols].sum(axis=1)
+    
+    # 10. Contact reachability
+    contact_cols = ['FLAG_MOBIL', 'FLAG_EMP_PHONE', 'FLAG_WORK_PHONE', 'FLAG_PHONE']
+    contact_cols = [c for c in contact_cols if c in full.columns]
+    if contact_cols:
+        full['CONTACT_SCORE'] = full[contact_cols].sum(axis=1)
+    
+    # =========================================================================
+    # AUXILIARY TABLE AGGREGATIONS
+    # =========================================================================
 
     bureau_path = auxiliary_table_paths().get("bureau")
     if bureau_path and bureau_path.exists():
@@ -182,6 +234,9 @@ def build_features() -> Tuple[pd.DataFrame, pd.DataFrame]:
     # Split back to train/test and drop helper flag
     train_features = full[full["dataset"] == "train"].drop(columns=["dataset"])
     test_features = full[full["dataset"] == "test"].drop(columns=["dataset", "TARGET"], errors="ignore")
+    
+    print(f"Feature engineering complete. Train: {train_features.shape}, Test: {test_features.shape}")
+    
     return train_features, test_features
 
 
